@@ -1,3 +1,9 @@
-from django.db import models
+from django.db.models import Model, CharField, EmailField
 
-# Create your models here.
+class User(Model):
+    username = CharField(max_length=255)
+    email = EmailField()
+    password = CharField(max_length=255)
+
+    def __str__(self):
+        return self.username
