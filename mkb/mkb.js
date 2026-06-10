@@ -7,8 +7,8 @@ const { GoalFollow } = goals
 let followTarget = null
 const bot = mineflayer.createBot({
     
-    host: 'Zhekagoogle228.aternos.me',
-    port: 59487,
+    host: 'GHFGHFGHFGGG.aternos.me',
+    port: 47181,
     username: 'MEGAGALANDON',
     version: '1.12.2'
   })
