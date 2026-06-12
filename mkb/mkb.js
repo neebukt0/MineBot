@@ -5,6 +5,7 @@ const vec3 = require('vec3')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const { GoalFollow } = goals
 let followTarget = null
+let killauraEnabled = false
 const bot = mineflayer.createBot({
     
     host: 'GHFGHFGHFGGG.aternos.me',
@@ -12,7 +13,7 @@ const bot = mineflayer.createBot({
     username: 'MEGAGALANDON',
     version: '1.12.2'
   })
-  
+  // Загрузка плагина pathfinder для навигации
 bot.loadPlugin(pathfinder)
 bot.on('spawn', () => {
   console.log('Бот зашёл на сервер')
@@ -23,7 +24,7 @@ bot.once('spawn', () => {
   })
 bot.on('chat', async (username, message) => {
   if (username === bot.username) return
-
+  //  console.log(`Сообщение от ${username}: ${message}`)
   if (username === bot.username) return
   switch (message) {
     case 'help':
@@ -34,6 +35,8 @@ bot.on('chat', async (username, message) => {
       bot.chat('build - поставить блок под собой')
       bot.chat('equip <предмет> - взять предмет в руку')
       bot.chat('follow <ник> - следовать за игроком')
+      bot.chat('chest - открыть сундук')
+      bot.chat('killaura <on/off> - включить/выключить killaura')
       bot.chat('stop - остановиться')
       break
     case 'loaded':
@@ -50,14 +53,30 @@ bot.on('chat', async (username, message) => {
       build()
       break
     case 'equip':
-      equipByName(message.split(' ')[1])
+      equipByName(args[1])
       break
   }
   const args = message.split(' ')
+  let killaura = false
 
+bot.on('chat', (username, message) => {
+if (message === 'killaura on') {
+  toggleKillaura(true)
+}
+if (message === 'chest') {
+  openChestAndSay()
+}
+if (message === 'killaura off') {
+  toggleKillaura(false)
+}
+})
   if (args[0] === 'follow') {
     followTarget = args[1]
     bot.chat(`Иду за ${followTarget}`)
+  }
+
+  if (args[0] === 'equip') {
+    equipByName(args[1])
   }
 
   if (args[0] === 'stop') {
@@ -67,19 +86,59 @@ bot.on('chat', async (username, message) => {
   }
 })
 
-bot.on('physicsTick', () => {
-    if (!followTarget) return
-  
-    const player = bot.players[followTarget]?.entity
-    if (!player) return
-  
-    const mcData = require('minecraft-data')(bot.version)
-    const movements = new Movements(bot, mcData)
-  
-    bot.pathfinder.setMovements(movements)
-    bot.pathfinder.setGoal(new GoalFollow(player, 1), true)
+async function openChestAndSay() {
+  const chest = bot.findBlock({
+    matching: b => b && b.name.includes('chest'),
+    maxDistance: 4
   })
 
+  if (!chest) {
+    bot.chat('Сундук не найден')
+    return
+  }
+
+  try {
+    await bot.pathfinder.goto(new goals.GoalBlock(chest.position.x, chest.position.y, chest.position.z))
+
+    const container = await bot.openContainer(chest)
+
+    const items = container.containerItems()
+
+    if (!items.length) {
+      bot.chat('Сундук пустой')
+    } else {
+      const text = items
+        .map(i => `${i.name} x${i.count}`)
+        .join(', ')
+
+      bot.chat(`В сундуке: ${text}`)
+    }
+
+    container.close()
+
+  } catch (err) {
+    console.log(err)
+    bot.chat('Ошибка при открытии сундука')
+  }
+}
+
+setInterval(() => {
+  if (!followTarget) return
+
+  const player = bot.players[followTarget]?.entity
+  if (!player) return
+
+  const door = bot.findBlock({
+  matching: (block) => block.name.includes('door'),
+  maxDistance: 3
+  })
+
+  if (door) {
+    bot.activateBlock(door)
+  }
+  bot.pathfinder.setGoal(new GoalFollow(player, 1), true)
+}, 5000)
+// Функция для отображения инвентаря в чате
 function sayItems (items = bot.inventory.items()) {
     const output = items.map(itemToString).join(', ')
     if (output) {
@@ -89,7 +148,7 @@ function sayItems (items = bot.inventory.items()) {
     }
   }
   
-
+//  Функция для экипировки лучшего инструмента для данного блока
   async function equipBestToolForBlock(block) {
     if (!block) return
   
@@ -119,6 +178,7 @@ function sayItems (items = bot.inventory.items()) {
       bot.chat(`Использую ${bestTool.name}`)
     }
   }
+  // Функция для копания блока под собой
   async function dig () {
     let target
   
@@ -144,7 +204,7 @@ function sayItems (items = bot.inventory.items()) {
       bot.chat('cannot dig')
     }
   }
-  
+    // Функция для строительства блока под собой
   function build () {
     const referenceBlock = bot.blockAt(bot.entity.position.offset(0, -1, 0))
     const jumpY = Math.floor(bot.entity.position.y) + 1.0
@@ -152,7 +212,7 @@ function sayItems (items = bot.inventory.items()) {
     bot.on('move', placeIfHighEnough)
   
     let tryCount = 0
-  
+    // Проверяем, достаточно ли высоко прыгнул бот для установки блока
     async function placeIfHighEnough () {
       if (bot.entity.position.y > jumpY) {
         try {
@@ -171,7 +231,56 @@ function sayItems (items = bot.inventory.items()) {
       }
     }
   }
-  
+// Функция для поиска блока, на который можно посадить семена
+function blockToSow () {
+  return bot.findBlock({
+    point: bot.entity.position,
+    matching: bot.registry.blocksByName.farmland.id,
+    maxDistance: 6,
+    useExtraInfo: (block) => {
+      const blockAbove = bot.blockAt(block.position.offset(0, 1, 0))
+      return !blockAbove || blockAbove.type === 0
+    }
+  })
+}
+// Функция для поиска созревшего блока пшеницы
+function blockToHarvest () {
+  return bot.findBlock({
+    point: bot.entity.position,
+    maxDistance: 6,
+    matching: (block) => {
+      return block && block.type === bot.registry.blocksByName.wheat.id && block.metadata === 7
+    }
+  })
+}
+// Основной цикл: сначала собираем, потом сажаем
+async function loop () {
+  try {
+    while (1) {
+      const toHarvest = blockToHarvest()
+      if (toHarvest) {
+        await bot.dig(toHarvest)
+      } else {
+        break
+      }
+    }
+    while (1) {
+      const toSow = blockToSow()
+      if (toSow) {
+        await bot.equip(bot.registry.itemsByName.wheat_seeds.id, 'hand')
+        await bot.placeBlock(toSow, new Vec3(0, 1, 0))
+      } else {
+        break
+      }
+    }
+  } catch (e) {
+    console.log(e)
+  }
+
+  setTimeout(loop, 1000)
+}
+
+// Функция для экипировки предмета по названию
 async function equipByName (name) {
     const item = bot.inventory.items().find(item =>
       item.name.includes(name)
@@ -185,7 +294,38 @@ async function equipByName (name) {
     await bot.equip(item, 'hand')
     bot.chat(`Взял ${item.name}`)
   }
-  
+
+function toggleKillaura(state) {
+    killauraEnabled = state
+    bot.chat(state ? 'KillAura ON' : 'KillAura OFF')
+  }
+setInterval(() => {
+  if (!killauraEnabled) return
+
+  const target = bot.nearestEntity(entity => {
+    return (
+      entity.type === 'mob' ||
+      (entity.type === 'player' && entity.username !== bot.username)
+    )
+  })
+
+  if (!target) return
+
+  const distance = bot.entity.position.distanceTo(target.position)
+
+  // смотрим на цель
+  bot.lookAt(
+    target.position.offset(0, target.height, 0),
+    true
+  )
+
+  // бьём если близко
+  if (distance < 4) {
+    bot.attack(target)
+  }
+}, 200)
+
+// Функция для преобразования предмета в строку
 function itemToString (item) {
     if (item) {
       return `${item.name} x ${item.count}`
@@ -200,3 +340,4 @@ bot.on('error', (err) => {
 bot.on('kicked', (reason) => {
   console.log('Кикнули:', reason)
 })
+
