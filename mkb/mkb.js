@@ -55,6 +55,12 @@ bot.on('chat', async (username, message) => {
     case 'equip':
       equipByName(args[1])
       break
+    case 'pech':
+      await openFurnace()
+      break
+    case 'smelt':
+      await smelt()
+      break
   }
   const args = message.split(' ')
   let killaura = false
@@ -85,7 +91,145 @@ if (message === 'killaura off') {
     bot.chat('Остановился')
   }
 })
+// Функция для открытия печки и вывода её содержимого в чат
+async function openFurnace() {
+  const furnaceBlock = bot.findBlock({
+    matching: b => b.name === 'furnace',
+    maxDistance: 15
+  })
 
+  if (!furnaceBlock) {
+    bot.chat('Печка не найдена')
+    return
+  }
+
+  await bot.waitForChunksToLoad()
+
+  const pos = furnaceBlock.position
+
+  bot.pathfinder.setGoal(new GoalNear(pos.x, pos.y, pos.z, 1))
+
+  await new Promise(resolve => {
+    const interval = setInterval(() => {
+      const dist = bot.entity.position.distanceTo(pos)
+
+      if (dist < 2.5) {
+        clearInterval(interval)
+        resolve()
+      }
+    }, 200)
+  })
+
+  try {
+    const furnace = await bot.openFurnace(furnaceBlock)
+
+    bot.chat('Печка открыта')
+
+    console.log({
+      input: furnace.inputItem(),
+      fuel: furnace.fuelItem(),
+      output: furnace.outputItem()
+    })
+
+    furnace.close()
+
+    bot.chat('Печка закрыта')
+  } catch (err) {
+    console.log(err)
+    bot.chat('Ошибка открытия печки')
+  }
+}
+// Функция для плавки руды в печке
+async function smelt() {
+  const furnaceBlock = bot.findBlock({
+    matching: b => b.name === 'furnace',
+    maxDistance: 15
+  })
+
+  if (!furnaceBlock) {
+    bot.chat('Печка не найдена')
+    return
+  }
+
+  await bot.waitForChunksToLoad()
+
+  const pos = furnaceBlock.position
+
+  bot.pathfinder.setGoal(new GoalNear(pos.x, pos.y, pos.z, 1))
+
+  await new Promise(resolve => {
+    const interval = setInterval(() => {
+      const dist = bot.entity.position.distanceTo(pos)
+      if (dist < 2.5) {
+        clearInterval(interval)
+        resolve()
+      }
+    }, 200)
+  })
+
+  let furnace
+  try {
+    furnace = await bot.openFurnace(furnaceBlock)
+  } catch (e) {
+    bot.chat('Не смог открыть печку')
+    return
+  }
+
+
+  const smeltables = [
+    'iron_ore',
+    'gold_ore',
+    'raw_beef',
+    'raw_porkchop',
+    'raw_chicken',
+    'raw_mutton',
+    'raw_rabbit'
+  ]
+
+  const fuelNames = ['coal', 'charcoal']
+
+  while (true) {
+    const item = bot.inventory.items().find(i =>
+      smeltables.includes(i.name)
+    )
+
+    if (!item) {
+      bot.chat('Нечего мне  плавить иди добывай руду')
+      furnace.close()
+      return
+    }
+
+    const fuel = bot.inventory.items().find(i =>
+      fuelNames.includes(i.name)
+    )
+
+    if (!fuel) {
+      bot.chat('Нету дизиля для плавки, иди добывай уголь')
+      furnace.close()
+      return
+    }
+
+    try {
+      await furnace.putFuel(fuel.type, null, 1)
+      await furnace.putInput(item.type, null, 1)
+
+      bot.chat(`хуярю ${item.name}`)
+
+      // ждём результат
+      while (!furnace.outputItem()) {
+        await bot.waitForTicks(20)
+      }
+
+      await furnace.takeOutput()
+
+      bot.chat('хахах,я переплавил железо')
+
+    } catch (e) {
+      console.log(e)
+      furnace.close()
+      return
+    }}}
+// Функция для открытия сундука и вывода его содержимого в чат
 async function openChestAndSay() {
   const chest = bot.findBlock({
     matching: b => b && b.name.includes('chest'),
