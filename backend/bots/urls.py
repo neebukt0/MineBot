@@ -1,6 +1,7 @@
-from django.urls import path
-from .views import BotListCreateView
+from rest_framework.routers import DefaultRouter
+from .views import BotViewSet
 
-urlpatterns = [
-    path("bots/", BotListCreateView.as_view(), name="bot-list-create "),
-]
+router = DefaultRouter()
+router.register(r"bots", BotViewSet, basename="bots")
+
+urlpatterns = router.urls

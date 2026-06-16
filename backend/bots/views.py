@@ -1,37 +1,26 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework import status
+
 from .models import Bot
 from .serializers import BotSerializer
-from .services import create_bot_file
+from .services import create_bot_file, send_command_to_bot, get_bot_status
 
 
-class BotListCreateView(APIView):
+class BotViewSet(ModelViewSet):
+    serializer_class = BotSerializer
     permission_classes = [IsAuthenticated]
-    def get(self, request):
-        bots = Bot.objects.filter(
-            owner=request.user
-        )
-        serializer = BotSerializer(
-            bots,
-            many=True
-        )
-        return Response(serializer.data)
-    def post(self, request):
-        serializer = BotSerializer(
-            data=request.data
-        )
-        if serializer.is_valid():
-            bot = serializer.save(
-                owner=request.user
-            )
+
+
+    def perform_create(self, serializer):
+        bot = serializer.save(owner=self.request.user)
+        try:
             create_bot_file(bot)
-            return Response(
-                BotSerializer(bot).data,
-                status=status.HTTP_201_CREATED
-            )
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        except Exception as e:
+            print("create_bot_file error:", e)
+    
+    def get_queryset(self):
+        return Bot.objects.filter(owner=self.request.user)    
+    

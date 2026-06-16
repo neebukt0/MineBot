@@ -2,15 +2,17 @@ const mineflayer = require('mineflayer')
 const mineflayerViewer = require('prismarine-viewer').mineflayer
 const viewer = require('prismarine-viewer')
 const vec3 = require('vec3')
+
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
-const { GoalFollow } = goals
+const { GoalFollow, GoalNear } = goals
+
 let followTarget = null
 let killauraEnabled = false
 const bot = mineflayer.createBot({
     
-    host: 'GHFGHFGHFGGG.aternos.me',
-    port: 47181,
-    username: 'MEGAGALANDON',
+    host: 'zdarovazaebal315.aternos.me',
+    port: 24106,
+    username: 'BOT',
     version: '1.12.2'
   })
   // Загрузка плагина pathfinder для навигации
@@ -37,7 +39,10 @@ bot.on('chat', async (username, message) => {
       bot.chat('follow <ник> - следовать за игроком')
       bot.chat('chest - открыть сундук')
       bot.chat('killaura <on/off> - включить/выключить killaura')
+      bot.chat('pech - открыть печку и показать её содержимое')
+      bot.chat('smelt - плавить руду в печке')
       bot.chat('stop - остановиться')
+
       break
     case 'loaded':
       await bot.waitForChunksToLoad()
@@ -213,7 +218,7 @@ async function smelt() {
       await furnace.putFuel(fuel.type, null, 1)
       await furnace.putInput(item.type, null, 1)
 
-      bot.chat(`хуярю ${item.name}`)
+      bot.chat(`переплавляю ${item.name}`)
 
       // ждём результат
       while (!furnace.outputItem()) {
