@@ -10,8 +10,8 @@ let followTarget = null
 let killauraEnabled = false
 const bot = mineflayer.createBot({
     
-    host: 'zdarovazaebal315.aternos.me',
-    port: 24106,
+    host: 'GHFGHFGHFGGG.aternos.me',
+    port: 47181,
     username: 'BOT',
     version: '1.12.2'
   })

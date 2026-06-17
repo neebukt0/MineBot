@@ -6,8 +6,13 @@ from rest_framework import status
 
 from .models import Bot
 from .serializers import BotSerializer
-from .services import create_bot_file, send_command_to_bot, get_bot_status
+from .services import create_bot_file
 
+import subprocess
+from pathlib import Path
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
 
 class BotViewSet(ModelViewSet):
     serializer_class = BotSerializer
@@ -22,5 +27,24 @@ class BotViewSet(ModelViewSet):
             print("create_bot_file error:", e)
     
     def get_queryset(self):
-        return Bot.objects.filter(owner=self.request.user)    
+        return Bot.objects.filter(owner=self.request.user)  
+    
+
+
+class StartBotView(APIView):
+    def post(self, request, bot_id):
+        bot_file = Path("bots_runtime") / f"{bot_id}.js"
+        if not bot_file.exists():
+            return Response(
+                {"error": "Bot file not found"},
+                status=404
+            )
+        subprocess.Popen(
+            ["node", str(bot_file)],
+            cwd="bots_runtime"
+        )
+        return Response({
+            "status": "started",
+            "bot_id": bot_id
+        })  
     
