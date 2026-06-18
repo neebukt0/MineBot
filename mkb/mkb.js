@@ -2,12 +2,15 @@ const mineflayer = require('mineflayer')
 const mineflayerViewer = require('prismarine-viewer').mineflayer
 const viewer = require('prismarine-viewer')
 const vec3 = require('vec3')
-
+const pvp = require('mineflayer-pvp').plugin
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const { GoalFollow, GoalNear } = goals
 
 let followTarget = null
 let killauraEnabled = false
+let guardPos = null
+let guardInterval = null
+
 const bot = mineflayer.createBot({
     
     host: 'GHFGHFGHFGGG.aternos.me',
@@ -17,6 +20,8 @@ const bot = mineflayer.createBot({
   })
   // Загрузка плагина pathfinder для навигации
 bot.loadPlugin(pathfinder)
+// Загрузка плагина pvp для боевых действий
+bot.loadPlugin(pvp)
 bot.on('spawn', () => {
   console.log('Бот зашёл на сервер')
   
@@ -41,6 +46,11 @@ bot.on('chat', async (username, message) => {
       bot.chat('killaura <on/off> - включить/выключить killaura')
       bot.chat('pech - открыть печку и показать её содержимое')
       bot.chat('smelt - плавить руду в печке')
+      bot.chat('mine <название руды> - добыть руду')
+      bot.chat('farmer - собирать созревшую пшеницу и сажать семена')
+      bot.chat('fishing <on/off> - включить/выключить рыбалку')
+      bot.chat('guard <on/off> - включить/выключить охрану территории')
+      bot.chat('find <название блока> - найти блок')
       bot.chat('stop - остановиться')
 
       break
@@ -95,7 +105,282 @@ if (message === 'killaura off') {
     bot.pathfinder.setGoal(null)
     bot.chat('Остановился')
   }
+  if (args[0] === 'mine') {
+    await mineOre(args[1])
+  }
+
+  if (args[0] === 'farmer') {
+    await farmer()
+  }
+
+  if (args[0] === 'fishing') {
+    if (args[1] === 'on') {
+      bot.chat('Рыбалка запущена')
+      startFishing()
+    }
+
+    if (args[1] === 'off') {
+      stopFishing()
+    }
+  }
+
+  if (message === 'guard on') {
+    startGuard(bot.entity.position.clone())
+  }
+
+  if (message === 'guard off') {
+    stopGuard()
+  }
+
+  if (args[0] === 'find') {
+    findBlockCoords(args[1])
+  }
+
+  if (message === 'coords') {
+    sendBotCoords()
+  }
 })
+
+// Функция для получения координат бота
+function getBotCoords() {
+  const { x, y, z } = bot.entity.position
+
+  return {
+    x: Math.floor(x),
+    y: Math.floor(y),
+    z: Math.floor(z)
+  }
+}
+
+// Функция для отправки координат бота
+function sendBotCoords() {
+  const { x, y, z } = getBotCoords()
+  bot.chat(`Мои координаты: X=${x} Y=${y} Z=${z}`)
+}
+
+// Функция для поиска координат блока
+function findBlockCoords(blockName, maxDistance = 64) {
+  const block = bot.findBlock({
+    matching: (b) => b && b.name === blockName,
+    maxDistance
+  })
+
+  if (!block) {
+    bot.chat(`Блок ${blockName} не найден`)
+    return null
+  }
+
+  const { x, y, z } = block.position
+
+  bot.chat(`${blockName}: X=${x} Y=${y} Z=${z}`)
+
+  return block.position
+}
+
+// Функция для рыбалки
+let fishingEnabled = false
+async function startFishing() {
+  fishingEnabled = true
+
+  while (fishingEnabled) {
+    try {
+      let rod = bot.inventory.items().find(
+        item => item.name.includes('fishing_rod')
+      )
+
+      if (!rod) {
+        bot.chat('Удочка не найдена')
+        return
+      }
+
+      await bot.equip(rod, 'hand')
+
+      await bot.fish()
+
+      await bot.waitForTicks(20)
+    } catch (err) {
+      console.log(err)
+      await bot.waitForTicks(40)
+    }
+  }
+}
+// Функция для остановки рыбалки
+function stopFishing() {
+  fishingEnabled = false
+  bot.chat('Рыбалка остановлена')
+}
+
+// Функция для сбора и пересадки созревших культур
+async function farmer(radius = 32) {
+  const cropsMap = {
+    wheat: 'wheat_seeds',
+    carrots: 'carrot',
+    potatoes: 'potato',
+    beetroot: 'beetroot_seeds'
+  }
+
+  const cropPositions = bot.findBlocks({
+    matching: block => {
+      if (!block) return false
+
+      return (
+        (block.name === 'wheat' && block.metadata === 7) ||
+        (block.name === 'carrots' && block.metadata === 7) ||
+        (block.name === 'potatoes' && block.metadata === 7) ||
+        (block.name === 'beetroots' && block.metadata === 3)
+      )
+    },
+    maxDistance: radius,
+    count: 1000
+  })
+
+  if (!cropPositions.length) {
+    bot.chat('Созревшие культуры не найдены')
+    return
+  }
+
+  for (const pos of cropPositions) {
+    try {
+      const crop = bot.blockAt(pos)
+      if (!crop) continue
+
+      const cropName = crop.name
+      const seedName = cropsMap[cropName]
+
+      await bot.pathfinder.goto(
+        new goals.GoalNear(pos.x, pos.y, pos.z, 1)
+      )
+
+      await bot.dig(crop)
+
+      await bot.waitForTicks(5)
+
+      const seedItem = bot.inventory.items().find(
+        item => item.name === seedName
+      )
+
+      if (!seedItem) continue
+
+      const farmland = bot.blockAt(pos.offset(0, -1, 0))
+      if (!farmland) continue
+
+      await bot.equip(seedItem, 'hand')
+
+      await bot.placeBlock(farmland, { x: 0, y: 1, z: 0 })
+
+      await bot.waitForTicks(2)
+    } catch (err) {
+      console.log(`Ошибка на ${pos}:`, err.message)
+    }
+  }
+
+  bot.chat('Все культуры собраны и пересажены')
+}
+
+// Функция для остановки охраны территории
+function stopGuard() {
+  if (guardInterval) {
+    clearInterval(guardInterval)
+    guardInterval = null
+  }
+
+  bot.pvp.stop()
+  guardPos = null
+
+  bot.chat('Охрана территории выключена')
+}
+
+// Функция для включения охраны территории
+function startGuard(position) {
+  guardPos = position
+
+  if (guardInterval) clearInterval(guardInterval)
+
+  bot.chat('Охрана территории включена')
+
+  guardInterval = setInterval(async () => {
+    try {
+      const target = getNearestHostile()
+
+      if (target) {
+        bot.pvp.attack(target)
+        return
+      }
+
+      if (
+        guardPos &&
+        bot.entity.position.distanceTo(guardPos) > 5
+      ) {
+        await bot.pathfinder.goto(
+          new goals.GoalNear(
+            guardPos.x,
+            guardPos.y,
+            guardPos.z,
+            2
+          )
+        )
+      }
+    } catch {}
+  }, 1000)
+}
+
+// Функция для получения ближайшего враждебного моба
+function getNearestHostile() {
+  const hostileMobs = [
+    'zombie',
+    'husk',
+    'drowned',
+    'skeleton',
+    'stray',
+    'creeper',
+    'spider',
+    'cave_spider',
+    'witch',
+    'enderman',
+    'slime',
+    'magma_cube',
+    'phantom',
+    'pillager',
+    'vindicator',
+    'evoker',
+    'ravager'
+  ]
+
+  return bot.nearestEntity(entity => {
+    return (
+      entity.type === 'mob' &&
+      hostileMobs.includes(entity.name) &&
+      entity.position.distanceTo(guardPos) < 20
+    )
+  })
+}
+
+// Функция для добычи руды по названию
+async function mineOre(oreName) {
+  const block = bot.findBlock({
+    matching: block =>
+      block && block.name.includes(oreName.toLowerCase()),
+    maxDistance: 64
+  })
+
+  if (!block) {
+    bot.chat(`Не найдено: ${oreName}`)
+    return
+  }
+
+  try {
+    await bot.pathfinder.goto(
+      new goals.GoalNear(block.position.x, block.position.y, block.position.z, 1)
+    )
+
+    await bot.dig(block)
+
+    bot.chat(`${oreName} добыт`)
+  } catch (err) {
+    console.log(err)
+  }
+}
+
 // Функция для открытия печки и вывода её содержимого в чат
 async function openFurnace() {
   const furnaceBlock = bot.findBlock({
