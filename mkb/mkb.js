@@ -7,9 +7,12 @@ const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
 const { GoalFollow, GoalNear } = goals
 
 let followTarget = null
+let followInterval = null
 let killauraEnabled = false
 let guardPos = null
 let guardInterval = null
+let home = null
+let lumberEnabled = false
 
 const bot = mineflayer.createBot({
     
@@ -51,6 +54,12 @@ bot.on('chat', async (username, message) => {
       bot.chat('fishing <on/off> - включить/выключить рыбалку')
       bot.chat('guard <on/off> - включить/выключить охрану территории')
       bot.chat('find <название блока> - найти блок')
+      bot.chat('coords - показать координаты бота')
+      bot.chat('home - установить дом')
+      bot.chat('gohome - идти домой')
+      bot.chat('followtome <ник> - следовать за игроком')
+      bot.chat('stopfollow - остановить следование')  
+      bot.chat('lumber <on/off> - включить/выключить рубку деревьев')
       bot.chat('stop - остановиться')
 
       break
@@ -139,7 +148,160 @@ if (message === 'killaura off') {
   if (message === 'coords') {
     sendBotCoords()
   }
+
+  if (message === 'home') {
+    setHome()
+  }
+
+  if (message === 'gohome') {
+    goHome()
+  }
+
+  if (args[0] === 'followtome') {
+    followMe(username)
+  }
+  if (args[0] === 'stopfollow') {
+    stopFollow()
+  }
+
+  if (args[0] === 'lumber') {
+    if (args[1] === 'on') {
+      startLumber()
+    }
+    if (args[1] === 'off') {
+      stopLumber()
+    }
+  }
+
+    
 })
+
+// Функция для включения рубки деревьев
+function startLumber() {
+  if (lumberEnabled) return
+
+  lumberEnabled = true
+  bot.chat('Рубка деревьев включена')
+
+  lumberLoop()
+}
+
+function stopLumber() {
+  lumberEnabled = false
+
+  bot.pathfinder.setGoal(null)
+  bot.chat('Рубка деревьев выключена')
+}
+
+// Основной цикл для рубки деревьев целиком
+async function lumberLoop() {
+  while (lumberEnabled) {
+    try {
+      const tree = bot.findBlock({
+        matching: block => isLog(block),
+        maxDistance: 64
+      })
+
+      if (!tree) {
+        await bot.waitForTicks(100)
+        continue
+      }
+
+      await chopTree(tree)
+
+      await bot.waitForTicks(20)
+    } catch (err) {
+      console.log(err)
+      await bot.waitForTicks(20)
+    }
+  }
+}
+
+// Функция для определения, является ли блок логом дерева
+function isLog(block) {
+  return block && (
+    block.name.includes('_log') ||
+    block.name.includes('_stem')
+  )
+}
+
+// Функция для рубки дерева целиком
+async function chopTree(logBlock) {
+  const logs = []
+
+  let pos = logBlock.position.clone()
+
+  while (true) {
+    const block = bot.blockAt(pos)
+
+    if (!isLog(block)) break
+
+    logs.push(block)
+    pos = pos.offset(0, 1, 0)
+  }
+
+  for (const log of logs) {
+    await bot.pathfinder.goto(
+      new goals.GoalNear(
+        log.position.x,
+        log.position.y,
+        log.position.z,
+        1
+      )
+    )
+
+    await bot.dig(log)
+  }
+}
+
+// Функция для следования за игроком
+function followMe(playerName) {
+  followTarget = playerName
+
+  bot.chat(`Иду за ${playerName}`)
+
+  if (followInterval) clearInterval(followInterval)
+
+  followInterval = setInterval(async () => {
+
+    if (!followTarget) return
+
+    const player = bot.players[followTarget]
+
+    if (!player || !player.entity) {
+      return
+    }
+
+    const pos = player.entity.position
+
+    try {
+      await bot.pathfinder.goto(
+        new goals.GoalNear(
+          pos.x,
+          pos.y,
+          pos.z,
+          2
+        )
+      )
+    } catch (err) {
+      console.log(err)
+    }
+
+  }, 2000)
+}
+
+// Функция для остановки следования
+function stopFollow() {
+  followTarget = null
+
+  if (followInterval) {
+    clearInterval(followInterval)
+    followInterval = null
+  }
+
+  bot.pathfinder.setGoal(null)
+  bot.chat('Перестал следовать')
+}
 
 // Функция для получения координат бота
 function getBotCoords() {
@@ -150,6 +312,47 @@ function getBotCoords() {
     y: Math.floor(y),
     z: Math.floor(z)
   }
+}
+
+// Функция для возвращения домой
+async function goHome() {
+  if (!home) {
+    bot.chat('Дом не установлен')
+    return
+  }
+
+  bot.chat('Иду домой...')
+
+  try {
+    await bot.pathfinder.goto(
+      new goals.GoalNear(
+        home.x,
+        home.y,
+        home.z,
+        1
+      )
+    )
+
+    bot.chat('Я дома')
+  } catch (err) {
+    console.log(err)
+    bot.chat('Не смог дойти домой')
+  }
+}
+
+// Функция для установки дома
+function setHome() {
+  const pos = bot.entity.position
+
+  home = {
+    x: Math.floor(pos.x),
+    y: Math.floor(pos.y),
+    z: Math.floor(pos.z)
+  }
+
+  bot.chat(
+    `Дом установлен: X=${home.x} Y=${home.y} Z=${home.z}`
+  )
 }
 
 // Функция для отправки координат бота
@@ -556,6 +759,7 @@ async function openChestAndSay() {
   }
 }
 
+// Основной цикл для следования за игроком и открытия дверей на пути
 setInterval(() => {
   if (!followTarget) return
 
