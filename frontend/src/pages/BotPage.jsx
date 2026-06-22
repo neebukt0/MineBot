@@ -20,6 +20,17 @@ export default function BotPage() {
         return [];
     };
 
+const deleteBot = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this bot?")) return;
+    
+    try {
+        await api.delete(`/bots/${id}/delete_bot/`);
+        setBots((prev) => prev.filter((b) => b.id !== id));
+    } catch (err) {
+        console.error("DELETE ERROR:", err.response?.data || err);
+    }
+};
+
     const loadBots = async () => {
         try {
             const { data } = await api.get("/bots/");
@@ -63,19 +74,28 @@ export default function BotPage() {
         }));
     };
 
+const startBot = async (id) => {
+    try {
+        // ID должен идти ДО названия экшена start
+        await api.post(`/bots/${id}/start/`);
+        alert("Bot started");
+    } catch (err) {
+        console.error("START ERROR:", err.response?.data || err);
+    }
+};
+
     useEffect(() => {
         loadBots();
     }, []);
 
     return (
         <div style={{ maxWidth: "900px", margin: "0 auto", padding: "20px" }}>
-            <h1>Мои боты</h1>
+            <h1>My bots</h1>
 
-            {/* FORM */}
             <form onSubmit={createBot}>
                 <input
                     name="name"
-                    placeholder="Название"
+                    placeholder="Name"
                     value={form.name}
                     onChange={handleChange}
                     required
@@ -85,7 +105,7 @@ export default function BotPage() {
 
                 <textarea
                     name="description"
-                    placeholder="Описание"
+                    placeholder="Description"
                     value={form.description}
                     onChange={handleChange}
                     rows={4}
@@ -96,7 +116,7 @@ export default function BotPage() {
 
                 <input
                     name="username"
-                    placeholder="Ник бота"
+                    placeholder="Bot username"
                     value={form.username}
                     onChange={handleChange}
                 />
@@ -105,7 +125,7 @@ export default function BotPage() {
 
                 <input
                     name="server_ip"
-                    placeholder="IP сервера"
+                    placeholder="Server IP"
                     value={form.server_ip}
                     onChange={handleChange}
                 />
@@ -115,7 +135,7 @@ export default function BotPage() {
                 <input
                     type="number"
                     name="server_port"
-                    placeholder="Порт"
+                    placeholder="Port"
                     value={form.server_port}
                     onChange={handleChange}
                 />
@@ -124,21 +144,20 @@ export default function BotPage() {
 
                 <input
                     name="version"
-                    placeholder="Версия"
+                    placeholder="Version"
                     value={form.version}
                     onChange={handleChange}
                 />
 
                 <br /><br />
 
-                <button type="submit">Создать бота</button>
+                <button type="submit">Create bot</button>
             </form>
 
             <hr />
 
-            {/* LIST */}
             {bots.length === 0 ? (
-                <p>Ботов пока нет</p>
+                <p>No bots</p>
             ) : (
                 bots.map((bot) => (
                     <div
@@ -152,12 +171,27 @@ export default function BotPage() {
                     >
                         <h3>{bot.name}</h3>
                         <p>{bot.description}</p>
-                        <p><b>UUID:</b> {bot.id}</p>
-                        <p><b>Ник:</b> {bot.username}</p>
+                        <p><b>ID:</b> {bot.id}</p>
+                        <p><b>Username:</b> {bot.username}</p>
                         <p>
-                            <b>Сервер:</b> {bot.server_ip}:{bot.server_port}
+                            <b>Server:</b> {bot.server_ip}:{bot.server_port}
                         </p>
-                        <p><b>Версия:</b> {bot.version}</p>
+                        <p><b>Version:</b> {bot.version}</p>
+
+                        <button
+                            onClick={() => startBot(bot.id)}
+                            style={{
+                                marginTop: "10px",
+                                padding: "6px 12px",
+                                cursor: "pointer"
+                            }}
+                        >
+                            Start bot
+                        </button>
+
+                        <button onClick={() => deleteBot(bot.id)}>
+                        Delete bot
+                        </button>
                     </div>
                 ))
             )}

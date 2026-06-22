@@ -16,11 +16,12 @@ let lumberEnabled = false
 
 const bot = mineflayer.createBot({
     
-    host: 'GHFGHFGHFGGG.aternos.me',
-    port: 47181,
-    username: 'BOT',
+    host: 'localhost',
+    port: 25565,
+    username: '123',
     version: '1.12.2'
-  })
+})
+  
   // Загрузка плагина pathfinder для навигации
 bot.loadPlugin(pathfinder)
 // Загрузка плагина pvp для боевых действий
@@ -115,12 +116,23 @@ if (message === 'killaura off') {
     bot.chat('Остановился')
   }
   if (args[0] === 'mine') {
-    await mineOre(args[1])
+
+    const ore = args[1]
+
+    const count = Number(args[2]) || 1
+
+
+    await mineOre(ore, count)
   }
 
-  if (args[0] === 'farmer') {
-    await farmer()
-  }
+  if(args[0] === 'farmer') {
+
+
+    if(args[1] === 'on') {
+      startFarmer()
+    }
+    if(args[1] === 'off') {
+      stopFarmer()
 
   if (args[0] === 'fishing') {
     if (args[1] === 'on') {
@@ -173,10 +185,9 @@ if (message === 'killaura off') {
     }
   }
 
-    
+}}
 })
 
-// Функция для включения рубки деревьев
 function startLumber() {
   if (lumberEnabled) return
 
@@ -190,69 +201,84 @@ function stopLumber() {
   lumberEnabled = false
 
   bot.pathfinder.setGoal(null)
-  bot.chat('Рубка деревьев выключена')
-}
+  bot.pvp?.stop?.()
 
-// Основной цикл для рубки деревьев целиком
+  bot.chat(' Рубка деревьев выключена')
+}
 async function lumberLoop() {
   while (lumberEnabled) {
     try {
+
       const tree = bot.findBlock({
-        matching: block => isLog(block),
-        maxDistance: 64
+        matching: isLog,
+        maxDistance: 32
       })
 
       if (!tree) {
-        await bot.waitForTicks(100)
+        await bot.waitForTicks(40)
         continue
       }
 
       await chopTree(tree)
 
-      await bot.waitForTicks(20)
+      await bot.waitForTicks(10)
+
     } catch (err) {
-      console.log(err)
+      console.log('lumber error:', err)
       await bot.waitForTicks(20)
     }
   }
 }
 
-// Функция для определения, является ли блок логом дерева
 function isLog(block) {
-  return block && (
-    block.name.includes('_log') ||
-    block.name.includes('_stem')
+  if (!block) return false
+
+  return (
+    block.name.endsWith('_log') ||
+    block.name.endsWith('_stem')
   )
 }
+async function chopTree(startBlock) {
+  const base = startBlock.position
+  const logs = new Set()
+  for (let x = -3; x <= 3; x++) {
+    for (let y = 0; y <= 10; y++) {
+      for (let z = -3; z <= 3; z++) {
 
-// Функция для рубки дерева целиком
-async function chopTree(logBlock) {
-  const logs = []
+        const block = bot.blockAt(base.offset(x, y, z))
 
-  let pos = logBlock.position.clone()
+        if (isLog(block)) {
+          logs.add(block)
+        }
 
-  while (true) {
-    const block = bot.blockAt(pos)
-
-    if (!isLog(block)) break
-
-    logs.push(block)
-    pos = pos.offset(0, 1, 0)
+      }
+    }
   }
 
   for (const log of logs) {
-    await bot.pathfinder.goto(
-      new goals.GoalNear(
-        log.position.x,
-        log.position.y,
-        log.position.z,
-        1
-      )
-    )
 
-    await bot.dig(log)
+    if (!lumberEnabled) return
+
+    try {
+      await bot.pathfinder.goto(
+        new goals.GoalNear(
+          log.position.x,
+          log.position.y,
+          log.position.z,
+          1
+        )
+      )
+
+      await bot.dig(log)
+
+      await bot.waitForTicks(2)
+
+    } catch (err) {
+      console.log('chop error:', err)
+    }
   }
 }
+
 
 // Функция для следования за игроком
 function followMe(playerName) {
@@ -382,104 +408,174 @@ function findBlockCoords(blockName, maxDistance = 64) {
 
 // Функция для рыбалки
 let fishingEnabled = false
+let fishing = false
+
+
 async function startFishing() {
+
+  if (fishingEnabled) return
+
   fishingEnabled = true
 
+  bot.chat('Рыбалка включена')
+
+
   while (fishingEnabled) {
+
     try {
-      let rod = bot.inventory.items().find(
-        item => item.name.includes('fishing_rod')
+
+      const rod = bot.inventory.items().find(
+        item => item.name === 'fishing_rod'
       )
+
 
       if (!rod) {
         bot.chat('Удочка не найдена')
-        return
+        fishingEnabled = false
+        break
       }
+
 
       await bot.equip(rod, 'hand')
 
+
       await bot.fish()
 
-      await bot.waitForTicks(20)
+
+      await bot.waitForTicks(10)
+
+
     } catch (err) {
+
       console.log(err)
+
       await bot.waitForTicks(40)
+
     }
+
   }
 }
+
+
 // Функция для остановки рыбалки
 function stopFishing() {
+
   fishingEnabled = false
+
+  if (bot.fishing) {
+    bot.activateItem()
+  }
+
   bot.chat('Рыбалка остановлена')
+
 }
 
 // Функция для сбора и пересадки созревших культур
 async function farmer(radius = 32) {
+
   const cropsMap = {
     wheat: 'wheat_seeds',
     carrots: 'carrot',
     potatoes: 'potato',
-    beetroot: 'beetroot_seeds'
+    beetroots: 'beetroot_seeds'
   }
 
-  const cropPositions = bot.findBlocks({
-    matching: block => {
-      if (!block) return false
 
-      return (
-        (block.name === 'wheat' && block.metadata === 7) ||
-        (block.name === 'carrots' && block.metadata === 7) ||
-        (block.name === 'potatoes' && block.metadata === 7) ||
-        (block.name === 'beetroots' && block.metadata === 3)
-      )
-    },
-    maxDistance: radius,
-    count: 1000
-  })
-
-  if (!cropPositions.length) {
-    bot.chat('Созревшие культуры не найдены')
-    return
-  }
-
-  for (const pos of cropPositions) {
-    try {
-      const crop = bot.blockAt(pos)
-      if (!crop) continue
-
-      const cropName = crop.name
-      const seedName = cropsMap[cropName]
-
-      await bot.pathfinder.goto(
-        new goals.GoalNear(pos.x, pos.y, pos.z, 1)
-      )
-
-      await bot.dig(crop)
-
-      await bot.waitForTicks(5)
-
-      const seedItem = bot.inventory.items().find(
-        item => item.name === seedName
-      )
-
-      if (!seedItem) continue
-
-      const farmland = bot.blockAt(pos.offset(0, -1, 0))
-      if (!farmland) continue
-
-      await bot.equip(seedItem, 'hand')
-
-      await bot.placeBlock(farmland, { x: 0, y: 1, z: 0 })
-
-      await bot.waitForTicks(2)
-    } catch (err) {
-      console.log(`Ошибка на ${pos}:`, err.message)
+  while (farmerEnabled) {
+    const cropPositions = bot.findBlocks({
+      matching: block => {
+        if (!block) return false
+        return (
+          (block.name === 'wheat' && block.metadata === 7) ||
+          (block.name === 'carrots' && block.metadata === 7) ||
+          (block.name === 'potatoes' && block.metadata === 7) ||
+          (block.name === 'beetroots' && block.metadata === 3)
+        )
+      },
+      maxDistance: radius,
+      count: 1000
+    })
+    if (!cropPositions.length) {
+      await bot.waitForTicks(100)
+      continue
     }
+    for (const pos of cropPositions) {
+      if (!farmerEnabled) break
+      try {
+        const crop = bot.blockAt(pos)
+        if (!crop) continue
+        const cropName = crop.name
+        const seedName = cropsMap[cropName]
+        await bot.pathfinder.goto(
+
+          new goals.GoalNear(
+            pos.x,
+            pos.y,
+            pos.z,
+            1
+          )
+
+        )
+        await bot.dig(crop)
+        await bot.waitForTicks(5)
+        const seedItem = bot.inventory.items().find(
+
+          item => item.name === seedName
+
+        )
+        if (!seedItem) continue
+        const farmland = bot.blockAt(
+
+          pos.offset(0, -1, 0)
+
+        )
+        if (!farmland) continue
+        await bot.equip(
+          seedItem,
+          'hand'
+        )
+        await bot.placeBlock(
+
+          farmland,
+
+          {
+            x:0,
+            y:1,
+            z:0
+          }
+
+        )
+        await bot.waitForTicks(5)
+      } catch(err) {
+        console.log(err)
+      }
+    }
+    await bot.waitForTicks(40)
   }
 
-  bot.chat('Все культуры собраны и пересажены')
 }
 
+function startFarmer() {
+
+  if (farmerEnabled) return
+
+
+  farmerEnabled = true
+
+  bot.chat('Ферма включена')
+
+
+  farmer()
+
+}
+
+function stopFarmer() {
+
+  farmerEnabled = false
+
+  bot.chat('Ферма выключена')
+
+}
 // Функция для остановки охраны территории
 function stopGuard() {
   if (guardInterval) {
@@ -501,12 +597,48 @@ function startGuard(position) {
 
   bot.chat('Охрана территории включена')
 
-  guardInterval = setInterval(async () => {
-    try {
-      const target = getNearestHostile()
 
-      if (target) {
-        bot.pvp.attack(target)
+  guardInterval = setInterval(async () => {
+
+    try {
+
+      const mobs = getHostileMobs()
+
+
+      if (mobs.length > 0) {
+
+        for (const mob of mobs) {
+
+          if (!guardPos) break
+
+
+          try {
+
+            await bot.pathfinder.goto(
+              new goals.GoalNear(
+                mob.position.x,
+                mob.position.y,
+                mob.position.z,
+                2
+              )
+            )
+
+
+            bot.pvp.attack(mob)
+
+
+            await bot.waitForTicks(40)
+
+
+            bot.pvp.stop()
+
+
+          } catch (err) {
+            console.log(err)
+          }
+
+        }
+
         return
       }
 
@@ -514,6 +646,7 @@ function startGuard(position) {
         guardPos &&
         bot.entity.position.distanceTo(guardPos) > 5
       ) {
+
         await bot.pathfinder.goto(
           new goals.GoalNear(
             guardPos.x,
@@ -522,13 +655,21 @@ function startGuard(position) {
             2
           )
         )
+
       }
-    } catch {}
+
+
+    } catch (err) {
+      console.log(err)
+    }
+
+
   }, 1000)
 }
 
 // Функция для получения ближайшего враждебного моба
-function getNearestHostile() {
+function getHostileMobs() {
+
   const hostileMobs = [
     'zombie',
     'husk',
@@ -546,42 +687,92 @@ function getNearestHostile() {
     'pillager',
     'vindicator',
     'evoker',
-    'ravager'
+    'ravager',
+    'zoglin',
+    'piglin_brute',
+    'warden'
   ]
 
-  return bot.nearestEntity(entity => {
+
+  return Object.values(bot.entities).filter(entity => {
+
     return (
       entity.type === 'mob' &&
       hostileMobs.includes(entity.name) &&
-      entity.position.distanceTo(guardPos) < 20
+      entity.position.distanceTo(bot.entity.position) < 20
     )
+
   })
+
 }
 
 // Функция для добычи руды по названию
-async function mineOre(oreName) {
-  const block = bot.findBlock({
-    matching: block =>
-      block && block.name.includes(oreName.toLowerCase()),
-    maxDistance: 64
-  })
+async function mineOre(oreName, amount = 1) {
 
-  if (!block) {
-    bot.chat(`Не найдено: ${oreName}`)
-    return
+  let mined = 0
+
+
+  while (mined < amount) {
+
+    const block = bot.findBlock({
+
+      matching: block =>
+        block &&
+        block.name.includes(oreName.toLowerCase()),
+
+      maxDistance: 64
+
+    })
+
+
+    if (!block) {
+
+      bot.chat(`Больше ${oreName} не найдено. Добыто: ${mined}`)
+      break
+
+    }
+
+
+    try {
+
+      await bot.pathfinder.goto(
+
+        new goals.GoalNear(
+          block.position.x,
+          block.position.y,
+          block.position.z,
+          1
+        )
+
+      )
+
+
+      await bot.dig(block)
+
+
+      mined++
+
+      bot.chat(
+        `${oreName}: ${mined}/${amount}`
+      )
+
+
+      await bot.waitForTicks(10)
+
+
+    } catch (err) {
+
+      console.log(err)
+
+      break
+
+    }
+
   }
+  bot.chat(
+    `Добыча завершена. Всего добыто: ${mined} ${oreName}`
+  )
 
-  try {
-    await bot.pathfinder.goto(
-      new goals.GoalNear(block.position.x, block.position.y, block.position.z, 1)
-    )
-
-    await bot.dig(block)
-
-    bot.chat(`${oreName} добыт`)
-  } catch (err) {
-    console.log(err)
-  }
 }
 
 // Функция для открытия печки и вывода её содержимого в чат
