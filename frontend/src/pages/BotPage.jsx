@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import "./BotPage.css";
+
 
 export default function BotPage() {
+
+    const navigate = useNavigate();
+
     const [bots, setBots] = useState([]);
+
 
     const [form, setForm] = useState({
         name: "",
@@ -13,188 +20,351 @@ export default function BotPage() {
         version: "1.12.2",
     });
 
-    const normalizeBots = (data) => {
-        if (Array.isArray(data)) return data;
-        if (Array.isArray(data?.results)) return data.results;
-        if (Array.isArray(data?.bots)) return data.bots;
-        return [];
+
+
+    const authError = (err) => {
+
+        if (
+            err.response?.status === 401 ||
+            err.response?.status === 403
+        ) {
+
+            localStorage.removeItem("access");
+            localStorage.removeItem("refresh");
+
+            navigate("/login");
+        }
+
     };
 
-const deleteBot = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this bot?")) return;
-    
-    try {
-        await api.delete(`/bots/${id}/delete_bot/`);
-        setBots((prev) => prev.filter((b) => b.id !== id));
-    } catch (err) {
-        console.error("DELETE ERROR:", err.response?.data || err);
-    }
-};
+
+
+    const normalizeBots = (data) => {
+
+        if (Array.isArray(data)) return data;
+
+        if (Array.isArray(data?.results))
+            return data.results;
+
+        if (Array.isArray(data?.bots))
+            return data.bots;
+
+        return [];
+
+    };
+
+
 
     const loadBots = async () => {
+
         try {
-            const { data } = await api.get("/bots/");
+
+            const {data} = await api.get("/bots/");
+
             setBots(normalizeBots(data));
-        } catch (err) {
-            console.error("LOAD ERROR:", err.response?.data || err);
-            setBots([]);
+
+
+        } catch(err){
+
+            authError(err);
+
+            console.error(err.response?.data);
+
         }
+
     };
 
-    const createBot = async (e) => {
+
+
+    const createBot = async(e)=>{
+
         e.preventDefault();
 
-        try {
-            const { data } = await api.post("/bots/", form);
 
-            setBots((prev) => [...prev, data]);
+        try {
+
+
+            const {data} = await api.post(
+                "/bots/",
+                form
+            );
+
+
+            setBots(prev=>[
+                ...prev,
+                data
+            ]);
+
+
 
             setForm({
-                name: "",
-                description: "",
-                username: "",
-                server_ip: "localhost",
-                server_port: 25565,
-                version: "1.12.2",
+                name:"",
+                description:"",
+                username:"",
+                server_ip:"localhost",
+                server_port:25565,
+                version:"1.12.2"
             });
-        } catch (err) {
-            console.error("CREATE ERROR:", err.response?.data || err);
+
+
+
+        }catch(err){
+
+            authError(err);
+
         }
+
     };
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
 
-        setForm((prev) => ({
+
+
+    const deleteBot = async(id)=>{
+
+
+        try{
+
+
+            await api.delete(
+                `/bots/${id}/delete_bot/`
+            );
+
+
+            setBots(prev =>
+                prev.filter(
+                    bot=>bot.id !== id
+                )
+            );
+
+
+        }catch(err){
+
+            authError(err);
+
+        }
+
+    };
+
+
+
+
+    const startBot = async(id)=>{
+
+
+        try{
+
+
+            await api.post(
+                `/bots/${id}/start/`
+            );
+
+
+            alert("Bot started");
+
+
+        }catch(err){
+
+            authError(err);
+
+        }
+
+    };
+
+
+
+
+    const handleChange=(e)=>{
+
+
+        const {name,value}=e.target;
+
+
+        setForm(prev=>({
+
             ...prev,
+
             [name]:
-                name === "server_port"
-                    ? Number(value)
-                    : value,
+
+            name==="server_port"
+
+            ? Number(value)
+
+            : value
+
         }));
+
     };
 
-const startBot = async (id) => {
-    try {
-        // ID должен идти ДО названия экшена start
-        await api.post(`/bots/${id}/start/`);
-        alert("Bot started");
-    } catch (err) {
-        console.error("START ERROR:", err.response?.data || err);
-    }
-};
 
-    useEffect(() => {
+
+
+    useEffect(()=>{
+
         loadBots();
-    }, []);
+
+    },[]);
+
+
+
 
     return (
-        <div style={{ maxWidth: "900px", margin: "0 auto", padding: "20px" }}>
-            <h1>My bots</h1>
 
-            <form onSubmit={createBot}>
-                <input
+        <div className="bots-page">
+
+
+            <div className="bots-container">
+
+
+                <h1>
+                    My <span>Bots</span> 🤖
+                </h1>
+
+
+
+                <form 
+                className="bot-form"
+                onSubmit={createBot}>
+
+
+                    <input
                     name="name"
-                    placeholder="Name"
+                    placeholder="Bot name"
                     value={form.name}
                     onChange={handleChange}
                     required
-                />
+                    />
 
-                <br /><br />
 
-                <textarea
+                    <textarea
                     name="description"
                     placeholder="Description"
                     value={form.description}
                     onChange={handleChange}
-                    rows={4}
-                    required
-                />
+                    />
 
-                <br /><br />
 
-                <input
+                    <input
                     name="username"
                     placeholder="Bot username"
                     value={form.username}
                     onChange={handleChange}
-                />
+                    />
 
-                <br /><br />
 
-                <input
+                    <input
                     name="server_ip"
                     placeholder="Server IP"
                     value={form.server_ip}
                     onChange={handleChange}
-                />
+                    />
 
-                <br /><br />
 
-                <input
+                    <input
                     type="number"
                     name="server_port"
-                    placeholder="Port"
                     value={form.server_port}
                     onChange={handleChange}
-                />
+                    />
 
-                <br /><br />
 
-                <input
+                    <input
                     name="version"
                     placeholder="Version"
                     value={form.version}
                     onChange={handleChange}
-                />
+                    />
 
-                <br /><br />
 
-                <button type="submit">Create bot</button>
-            </form>
+                    <button>
+                        Create bot
+                    </button>
 
-            <hr />
 
-            {bots.length === 0 ? (
+                </form>
+
+
+
+
+                <div className="bot-list">
+
+
+                {
+                bots.length===0
+
+                ?
+
                 <p>No bots</p>
-            ) : (
-                bots.map((bot) => (
-                    <div
-                        key={bot.id}
-                        style={{
-                            border: "1px solid #ddd",
-                            margin: "10px 0",
-                            padding: "10px",
-                            borderRadius: "8px",
-                        }}
-                    >
-                        <h3>{bot.name}</h3>
-                        <p>{bot.description}</p>
-                        <p><b>ID:</b> {bot.id}</p>
-                        <p><b>Username:</b> {bot.username}</p>
-                        <p>
-                            <b>Server:</b> {bot.server_ip}:{bot.server_port}
-                        </p>
-                        <p><b>Version:</b> {bot.version}</p>
 
-                        <button
-                            onClick={() => startBot(bot.id)}
-                            style={{
-                                marginTop: "10px",
-                                padding: "6px 12px",
-                                cursor: "pointer"
-                            }}
-                        >
-                            Start bot
-                        </button>
 
-                        <button onClick={() => deleteBot(bot.id)}>
-                        Delete bot
-                        </button>
-                    </div>
+                :
+
+                bots.map(bot=>(
+
+
+                <div
+                className="bot-card"
+                key={bot.id}>
+
+
+                    <h2>
+                        {bot.name}
+                    </h2>
+
+
+                    <p>{bot.description}</p>
+
+
+                    <p>
+                    ID: {bot.id}
+                    </p>
+
+
+                    <p>
+                    Server:
+                    {bot.server_ip}:
+                    {bot.server_port}
+                    </p>
+
+
+                    <p>
+                    Version:
+                    {bot.version}
+                    </p>
+
+
+
+                    <button
+                    onClick={()=>
+                    startBot(bot.id)}>
+                        Start
+                    </button>
+
+
+
+                    <button
+                    className="delete"
+                    onClick={()=>
+                    deleteBot(bot.id)}>
+                        Delete
+                    </button>
+
+
+                </div>
+
+
                 ))
-            )}
+
+                }
+
+
+                </div>
+
+
+            </div>
+
+
         </div>
+
     );
+
 }

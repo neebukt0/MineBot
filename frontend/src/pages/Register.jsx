@@ -1,71 +1,108 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import api from "../api/axios"
+import "./Register.css"
 
 function Register() {
 
+    const navigate = useNavigate()
+
     const [username, setUsername] = useState("")
-    const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
+    const [password2, setPassword2] = useState("")
+
 
     const handleRegister = async () => {
 
         try {
 
-            const response = await api.post(
+            await api.post(
                 "auth/register/",
                 {
                     username,
-                    email,
                     password,
+                    password2
                 }
             )
 
-            console.log(response.data)
 
-            alert("Registration successful")
+            alert("Registration success")
 
-        } catch (error) {
 
-            console.log(error.response.data)
+            // после регистрации отправляем на логин
+            navigate("/login")
+
+
+        } catch (err) {
+
+            console.log(err.response?.data)
+
+            alert("Ошибка регистрации")
 
         }
     }
 
+
     return (
-        <div>
 
-            <h1>Register</h1>
+        <div className="register-page">
 
-            <input
-                type="text"
-                placeholder="Username"
-                onChange={(e) =>
-                    setUsername(e.target.value)
-                }
-            />
 
-            <input
-                type="email"
-                placeholder="Email"
-                onChange={(e) =>
-                    setEmail(e.target.value)
-                }
-            />
+            <div className="register-card">
 
-            <input
-                type="password"
-                placeholder="Password"
-                onChange={(e) =>
-                    setPassword(e.target.value)
-                }
-            />
 
-            <button onClick={handleRegister}>
-                Register
-            </button>
+                <h1>
+                    Регистрация в <span>Bot Project</span>
+                </h1>
+
+
+
+                <input
+                    type="text"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e)=>
+                        setUsername(e.target.value)
+                    }
+                />
+
+
+
+                <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e)=>
+                        setPassword(e.target.value)
+                    }
+                />
+
+
+
+                <input
+                    type="password"
+                    placeholder="Repeat password"
+                    value={password2}
+                    onChange={(e)=>
+                        setPassword2(e.target.value)
+                    }
+                />
+
+
+
+                <button onClick={handleRegister}>
+                    Создать аккаунт
+                </button>
+
+
+
+            </div>
+
 
         </div>
+
     )
 }
+
 
 export default Register

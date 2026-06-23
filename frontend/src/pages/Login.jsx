@@ -1,10 +1,15 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import api from "../api/axios"
+import "./Login.css"
 
 function Login() {
 
+    const navigate = useNavigate()
+
     const [username, setUsername] = useState("")
     const [password, setPassword] = useState("")
+
 
     const handleLogin = async () => {
 
@@ -18,7 +23,6 @@ function Login() {
                 }
             )
 
-            console.log(response.data)
 
             localStorage.setItem(
                 "access",
@@ -30,42 +34,66 @@ function Login() {
                 response.data.refresh
             )
 
+
             alert("Login success")
 
-        }catch (err) {
-            console.log("STATUS:", err.response.status)
-            console.log("DATA:", err.response.data)
-            console.log("HEADERS:", err.response.headers)
+
+
+            navigate("/bots")
+
+
+        } catch (err) {
+
+            console.log(err.response?.data)
+
+            alert("Ошибка авторизации")
+
         }
     }
 
+
     return (
-        <div>
 
-            <h1>Login</h1>
+        <div className="login-page">
 
-            <input
-                type="text"
-                placeholder="Username"
-                onChange={(e) =>
-                    setUsername(e.target.value)
-                }
-            />
+            <div className="login-card">
 
-            <input
-                type="password"
-                placeholder="Password"
-                onChange={(e) =>
-                    setPassword(e.target.value)
-                }
-            />
+                <h1>
+                    Вход в <span>Bot Project</span>
+                </h1>
 
-            <button onClick={handleLogin}>
-                Login
-            </button>
+
+                <input
+                    type="text"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) =>
+                        setUsername(e.target.value)
+                    }
+                />
+
+
+                <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) =>
+                        setPassword(e.target.value)
+                    }
+                />
+
+
+                <button onClick={handleLogin}>
+                    Войти
+                </button>
+
+
+            </div>
 
         </div>
+
     )
 }
+
 
 export default Login
