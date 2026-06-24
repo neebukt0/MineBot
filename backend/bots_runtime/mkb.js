@@ -13,6 +13,17 @@ let guardPos = null
 let guardInterval = null
 let home = null
 let lumberEnabled = false
+let farmerEnabled = false
+let fishingEnabled = false
+let fishing = false
+
+// const bot = mineflayer.createBot({
+    
+//     host: 'GHFGHFGHFGGG.aternos.me',
+//     port: 47181,
+//     username: "bot",
+//     version: '1.12.2'
+// })
 
 const bot = mineflayer.createBot({
     
@@ -89,52 +100,72 @@ bot.on('chat', async (username, message) => {
   }
   const args = message.split(' ')
   let killaura = false
-
-bot.on('chat', (username, message) => {
-if (message === 'killaura on') {
-  toggleKillaura(true)
-}
-if (message === 'chest') {
-  openChestAndSay()
-}
-if (message === 'killaura off') {
-  toggleKillaura(false)
-}
 })
+bot.on('chat', async (username, message) => {
+
+  const args = message.split(' ')
+
+  if (message === 'killaura on') {
+    toggleKillaura(true)
+    bot.chat('Killaura включена')
+  }
+
+  if (message === 'killaura off') {
+    toggleKillaura(false)
+    bot.chat('Killaura выключена')
+  }
+
+
+  if (message === 'chest') {
+    openChestAndSay()
+  }
+
+
   if (args[0] === 'follow') {
     followTarget = args[1]
     bot.chat(`Иду за ${followTarget}`)
   }
 
+
   if (args[0] === 'equip') {
     equipByName(args[1])
   }
+
 
   if (args[0] === 'stop') {
     followTarget = null
     bot.pathfinder.setGoal(null)
     bot.chat('Остановился')
   }
+
+
   if (args[0] === 'mine') {
 
     const ore = args[1]
-
     const count = Number(args[2]) || 1
 
-
     await mineOre(ore, count)
+
   }
 
-  if(args[0] === 'farmer') {
 
+  if (args[0] === 'farmer') {
 
-    if(args[1] === 'on') {
+    if (args[1] === 'on') {
       startFarmer()
+      bot.chat('Фермер включен')
     }
-    if(args[1] === 'off') {
+
+    if (args[1] === 'off') {
       stopFarmer()
+      bot.chat('Фермер выключен')
+    }
+
+  }
+
 
   if (args[0] === 'fishing') {
+
     if (args[1] === 'on') {
       bot.chat('Рыбалка запущена')
       startFishing()
@@ -143,100 +174,171 @@ if (message === 'killaura off') {
     if (args[1] === 'off') {
       stopFishing()
     }
+
   }
+
 
   if (message === 'guard on') {
     startGuard(bot.entity.position.clone())
   }
 
+
   if (message === 'guard off') {
     stopGuard()
   }
+
 
   if (args[0] === 'find') {
     findBlockCoords(args[1])
   }
 
+
   if (message === 'coords') {
     sendBotCoords()
   }
+
 
   if (message === 'home') {
     setHome()
   }
 
+
   if (message === 'gohome') {
     goHome()
   }
 
+
   if (args[0] === 'followtome') {
     followMe(username)
   }
+
+
   if (args[0] === 'stopfollow') {
     stopFollow()
   }
 
+
   if (args[0] === 'lumber') {
+
     if (args[1] === 'on') {
       startLumber()
     }
+
     if (args[1] === 'off') {
       stopLumber()
     }
+
   }
 
-}}
 })
 
+
 function startLumber() {
+
   if (lumberEnabled) return
 
   lumberEnabled = true
+
   bot.chat('Рубка деревьев включена')
 
   lumberLoop()
+
 }
 
+
 function stopLumber() {
+
   lumberEnabled = false
 
   bot.pathfinder.setGoal(null)
-  bot.pvp?.stop?.()
 
-  bot.chat(' Рубка деревьев выключена')
+  bot.chat('Рубка деревьев выключена')
+
 }
+
 async function lumberLoop() {
+
+
+  console.log('Лесоруб запущен')
+
+
   while (lumberEnabled) {
+
+
     try {
 
+
+      console.log('Ищу дерево...')
+
+
       const tree = bot.findBlock({
+
         matching: isLog,
+
         maxDistance: 32
+
       })
 
+
+
       if (!tree) {
+
+
+        console.log('Дерево не найдено')
+
+
         await bot.waitForTicks(40)
+
         continue
+
       }
+
+
+
+      console.log('Нашёл дерево:', tree.name)
+
+
 
       await chopTree(tree)
 
-      await bot.waitForTicks(10)
+
+
+      await bot.waitForTicks(20)
+
+
 
     } catch (err) {
+
+
       console.log('lumber error:', err)
+
+
       await bot.waitForTicks(20)
+
+
     }
+
   }
+
+
 }
 
 function isLog(block) {
+
+
   if (!block) return false
 
+
+
   return (
-    block.name.endsWith('_log') ||
-    block.name.endsWith('_stem')
+
+    block.name.includes('log') ||
+
+    block.name.includes('stem')
+
   )
+
+
 }
 async function chopTree(startBlock) {
   const base = startBlock.position
@@ -407,9 +509,24 @@ function findBlockCoords(blockName, maxDistance = 64) {
 }
 
 // Функция для рыбалки
-let fishingEnabled = false
-let fishing = false
 
+
+
+
+function isWater(block) {
+  if (!block) return false
+  return block.name === 'water'
+}
+
+async function findWaterBlock() {
+
+  const water = bot.findBlock({
+    matching: isWater,
+    maxDistance: 64
+  })
+
+  return water
+}
 
 async function startFishing() {
 
@@ -424,10 +541,8 @@ async function startFishing() {
 
     try {
 
-      const rod = bot.inventory.items().find(
-        item => item.name === 'fishing_rod'
-      )
-
+      const rod = bot.inventory.items()
+        .find(i => i.name === 'fishing_rod')
 
       if (!rod) {
         bot.chat('Удочка не найдена')
@@ -435,25 +550,49 @@ async function startFishing() {
         break
       }
 
+      const water = await findWaterBlock()
+
+      if (!water) {
+        bot.chat('Вода не найдена')
+        await bot.waitForTicks(40)
+        continue
+      }
+
+      // идём к воде
+      await bot.pathfinder.goto(
+        new goals.GoalNear(
+          water.position.x,
+          water.position.y,
+          water.position.z,
+          3 
+        )
+      )
 
       await bot.equip(rod, 'hand')
 
-
       await bot.fish()
-
 
       await bot.waitForTicks(10)
 
-
     } catch (err) {
 
-      console.log(err)
+      console.log('fishing error:', err)
 
-      await bot.waitForTicks(40)
+      await bot.waitForTicks(20)
 
     }
 
   }
+
+  bot.chat('Рыбалка выключена')
+}
+
+function stopFishing() {
+
+  fishingEnabled = false
+
+  bot.chat('Рыбалка остановлена')
+
 }
 
 
