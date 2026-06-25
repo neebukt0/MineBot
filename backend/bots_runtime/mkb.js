@@ -230,8 +230,31 @@ bot.on('chat', async (username, message) => {
 
   }
 
+  if (args[0] === 'dropinv') {
+    const targetName = args[1]
+
+    if (!targetName) {
+      bot.chat('Используй: dropinv username')
+      return
+    }
+
 })
 
+
+async function dropInventory(target) {
+  const items = bot.inventory.items()
+
+  for (const item of items) {
+
+    await bot.tossStack(item)
+
+    await bot.waitForTicks(5)
+
+    bot.lookAt(target.position.offset(0,1,0))
+
+    await bot.waitForTicks(2)
+  }
+}
 
 function startLumber() {
 
