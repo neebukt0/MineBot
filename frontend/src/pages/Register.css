@@ -1,200 +1,85 @@
-.register-page {
-
-
-    height: 100vh;
-
-
-    background: #050505;
-
-
-    display: flex;
-
-
-    justify-content: center;
-
-
-    align-items: center;
-
-
-    font-family: Arial, sans-serif;
-
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+    width: 100%;
+    min-height: 100%;
+    background: #050505;
+    overflow-x: hidden;
+    font-family: Arial, sans-serif;
+}
 
-
+.register-page {
+    min-height: 100vh;
+    background: #050505;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+}
 
 .register-card {
-
-
     width: 420px;
-
-
+    max-width: 100%;
     padding: 45px;
-
-
     background: #0b0b0b;
-
-
     border-radius: 20px;
-
-
     text-align: center;
-
-
-
     border: 1px solid #00ff66;
-
-
-
     box-shadow:
-
-    0 0 25px rgba(0,255,102,0.25);
-
+        0 0 25px rgba(0, 255, 102, 0.25),
+        inset 0 0 20px rgba(0, 255, 102, 0.05);
 }
-
-
-
 
 h1 {
-
-
     color: white;
-
-
     margin-bottom: 30px;
-
-
+    font-size: 34px;
 }
-
-
 
 h1 span {
-
-
     color: #00ff66;
-
-
 }
-
-
-
-
 
 input {
-
-
-    width: 90%;
-
-
+    width: 100%;
     padding: 15px;
-
-
-    margin: 10px;
-
-
-
+    margin: 10px 0;
     background: #111;
-
-
     color: white;
-
-
-
     border: 1px solid #333;
-
-
-
     border-radius: 10px;
-
-
-
     outline: none;
-
-
-
     font-size: 16px;
-
+    transition: 0.3s;
 }
-
-
-
-
 
 input:focus {
-
-
     border-color: #00ff66;
-
-
-    box-shadow:
-
-    0 0 10px rgba(0,255,102,0.5);
-
+    box-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
 }
-
-
-
-
 
 button {
-
-
+    width: 100%;
     margin-top: 25px;
-
-
-    width: 95%;
-
-
-
     padding: 15px;
-
-
-
     background: #00ff66;
-
-
-
     color: black;
-
-
-
     border: 2px solid #00ff66;
-
-
-
     border-radius: 10px;
-
-
-
     font-size: 17px;
-
-
-
+    font-weight: bold;
     cursor: pointer;
-
-
-
     transition: 0.3s;
-
 }
 
-
-
-
-
 button:hover {
-
-
     background: transparent;
-
-
-
     color: #00ff66;
-
-
-
-    box-shadow:
-
-    0 0 20px #00ff66;
-
+    box-shadow: 0 0 20px #00ff66;
 }
