@@ -27,10 +27,10 @@ let fishing = false
 
 const bot = mineflayer.createBot({
     
-    host: server_ip,
-    port: server_port,
-    username: bot_username,
-    version: server_version
+    host: 'localhost',
+    port: 25565,
+    username: '123',
+    version: '1.12.2'
 })
   
   // Загрузка плагина pathfinder для навигации
